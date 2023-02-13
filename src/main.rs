@@ -86,6 +86,12 @@ fn parse_uptime(i: &str) -> IResult<&str, Duration> {
     Ok((i, Duration::from_secs_f64(u)))
 }
 
+fn parse_meminfo(i: &str) -> IResult<&str, MemInfo> {
+    let (i, total) = delimited(tag("MemTotal:"), parse_usize, tag("kB\n"))(i)?;
+    let (i, free) = delimited(tag("MemFree:"), parse_usize, tag("kB\n"))(i)?;
+    Ok((i, MemInfo { total, free }))
+}
+
 fn main() {}
 
 #[test]
@@ -123,4 +129,24 @@ fn parse_proc_uptime() {
     let proc_uptime = "605581.79 954456.53";
     let (_, uptime) = parse_uptime(proc_uptime).unwrap();
     assert_eq!(uptime, Duration::from_secs_f64(605581.79))
+}
+
+#[test]
+fn parse_proc_meminfo() {
+    let proc_meminfo = "MemTotal:       16107060 kB
+MemFree:          196332 kB
+MemAvailable:   12074844 kB
+Buffers:         2756320 kB
+Cached:          9002228 kB
+SwapCached:        18052 kB
+Active:          7307032 kB
+";
+    let (_, meminfo) = parse_meminfo(proc_meminfo).unwrap();
+    assert_eq!(
+        meminfo,
+        MemInfo {
+            total: 16107060,
+            free: 196332
+        }
+    );
 }
