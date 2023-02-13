@@ -144,8 +144,8 @@ async fn main() {
 #[template(path = "index.html")]
 struct IndexTemplate {
     uptime: String,
-    cpu: usize,
-    mem: usize,
+    cpu: String,
+    mem: String,
 }
 
 struct HtmlTemplate<T>(T);
@@ -166,6 +166,12 @@ where
     }
 }
 
+fn progress_bar(value: usize, max: usize) -> String {
+    let segment_value = max / 20;
+    let segments = value / segment_value;
+    format!("[{}{}]", "#".repeat(segments), ":".repeat(20 - segments))
+}
+
 async fn root() -> impl IntoResponse {
     let proc_stat = read_file("/proc/stat");
     let proc_meminfo = read_file("/proc/meminfo");
@@ -175,10 +181,13 @@ async fn root() -> impl IntoResponse {
     let (_, mem_info) = parse_meminfo(&proc_meminfo).expect("Unable to parse /proc/meminfo");
     let (_, uptime) = parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
 
+    let cpu_bar = progress_bar(100 - average_cpu_idle(&stat), 100);
+    let mem_bar = progress_bar(total_used_memory(&mem_info), 100);
+
     let template = IndexTemplate {
         uptime: format_duration(&uptime),
-        cpu: 100 - average_cpu_idle(&stat),
-        mem: total_used_memory(&mem_info),
+        cpu: cpu_bar,
+        mem: mem_bar,
     };
     HtmlTemplate(template)
 }

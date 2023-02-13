@@ -3,12 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <title>Ansíne</title>
+    <style>
+    body {
+      background-color: #000000;
+      font-family: monospace;
+      color: #ffffff;
+      font-size: 18px;
+    }
+    </style>
   </head>
   <body>
     <ul>
       <li>Uptime: {{ uptime }}</li>
-      <li><label for="cpu-usage">CPU:</label><progress id="cpu-usage" max="100" value="{{ cpu }}"></progress></li>
-      <li><label for="mem-usage">MEM:</label><progress id="mem-usage" max="100" value="{{ mem }}"></progress></li>
+      <li><label for="cpu-usage">CPU:</label><span id="cpu-usage">{{ cpu }}</span></li>
+      <li><label for="mem-usage">MEM:</label><span id="mem-usage">{{ mem }}</span></li>
     </ul>
   </body>
 </html>
