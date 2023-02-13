@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ansíne</title>
+  </head>
+  <body>
+    <ul>
+      <li>Uptime: {{ uptime }}</li>
+      <li><label for="cpu-usage">CPU:</label><progress id="cpu-usage" max="100" value="{{ cpu }}"></progress></li>
+      <li><label for="mem-usage">MEM:</label><progress id="mem-usage" max="100" value="{{ mem }}"></progress></li>
+    </ul>
+  </body>
+</html>

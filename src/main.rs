@@ -1,5 +1,4 @@
-use std::str;
-use std::time::Duration;
+use std::{fs::read_to_string, net::SocketAddr, str, time::Duration};
 
 use nom::{
     bytes::complete::{tag, take_until},
@@ -9,6 +8,14 @@ use nom::{
     number::complete::double,
     sequence::{delimited, preceded, tuple},
     IResult,
+};
+
+use askama::Template;
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+    Router,
 };
 
 #[derive(Debug, PartialEq)]
@@ -28,7 +35,7 @@ struct Stat {
 #[derive(Debug, PartialEq)]
 struct MemInfo {
     total: usize,
-    free: usize,
+    available: usize,
 }
 
 fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
@@ -88,11 +95,12 @@ fn parse_uptime(i: &str) -> IResult<&str, Duration> {
 
 fn parse_meminfo(i: &str) -> IResult<&str, MemInfo> {
     let (i, total) = delimited(tag("MemTotal:"), parse_usize, tag("kB\n"))(i)?;
-    let (i, free) = delimited(tag("MemFree:"), parse_usize, tag("kB\n"))(i)?;
-    Ok((i, MemInfo { total, free }))
+    let (i, _) = delimited(tag("MemFree:"), parse_usize, tag("kB\n"))(i)?;
+    let (i, available) = delimited(tag("MemAvailable:"), parse_usize, tag("kB\n"))(i)?;
+    Ok((i, MemInfo { total, available }))
 }
 
-fn average_cpu_idle(cpu: Stat) -> usize {
+fn average_cpu_idle(cpu: &Stat) -> usize {
     (cpu.idle * 100)
         / (cpu.user
             + cpu.nice
@@ -106,11 +114,74 @@ fn average_cpu_idle(cpu: Stat) -> usize {
             + cpu.guest_nice)
 }
 
-fn total_used_memory(mem: MemInfo) -> usize {
-    ((mem.total - mem.free) * 100) / mem.total
+fn total_used_memory(mem: &MemInfo) -> usize {
+    ((mem.total - mem.available) * 100) / mem.total
 }
 
-fn main() {}
+fn read_file(fp: &str) -> String {
+    read_to_string(fp).expect("Unable to read file")
+}
+
+fn format_duration(duration: &Duration) -> String {
+    let secs = duration.as_secs();
+    let days = secs / 86400;
+    let hours = (secs % 86400) / 3600;
+    let mins = (secs % 3600) / 60;
+    format!("{}d.{}h.{}m", days, hours, mins)
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new().route("/", get(root));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+#[derive(Template)]
+#[template(path = "index.html")]
+struct IndexTemplate {
+    uptime: String,
+    cpu: usize,
+    mem: usize,
+}
+
+struct HtmlTemplate<T>(T);
+
+impl<T> IntoResponse for HtmlTemplate<T>
+where
+    T: Template,
+{
+    fn into_response(self) -> Response {
+        match self.0.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to render template. Error: {}", err),
+            )
+                .into_response(),
+        }
+    }
+}
+
+async fn root() -> impl IntoResponse {
+    let proc_stat = read_file("/proc/stat");
+    let proc_meminfo = read_file("/proc/meminfo");
+    let proc_uptime = read_file("/proc/uptime");
+
+    let (_, stat) = parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
+    let (_, mem_info) = parse_meminfo(&proc_meminfo).expect("Unable to parse /proc/meminfo");
+    let (_, uptime) = parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
+
+    let template = IndexTemplate {
+        uptime: format_duration(&uptime),
+        cpu: 100 - average_cpu_idle(&stat),
+        mem: total_used_memory(&mem_info),
+    };
+    HtmlTemplate(template)
+}
 
 #[test]
 fn parse_proc_stat() {
@@ -164,7 +235,7 @@ Active:          7307032 kB
         meminfo,
         MemInfo {
             total: 16107060,
-            free: 196332
+            available: 12074844,
         }
     );
 }
@@ -183,14 +254,14 @@ fn test_cpu_idle() {
         guest: 800,
         guest_nice: 900,
     };
-    assert_eq!(average_cpu_idle(stat), 50);
+    assert_eq!(average_cpu_idle(&stat), 50);
 }
 
 #[test]
 fn test_total_mem_used() {
     let mem = MemInfo {
         total: 1000,
-        free: 500,
+        available: 500,
     };
-    assert_eq!(total_used_memory(mem), 50);
+    assert_eq!(total_used_memory(&mem), 50);
 }
