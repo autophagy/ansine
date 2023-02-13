@@ -92,6 +92,24 @@ fn parse_meminfo(i: &str) -> IResult<&str, MemInfo> {
     Ok((i, MemInfo { total, free }))
 }
 
+fn average_cpu_idle(cpu: Stat) -> usize {
+    (cpu.idle * 100)
+        / (cpu.user
+            + cpu.nice
+            + cpu.system
+            + cpu.idle
+            + cpu.iowait
+            + cpu.irq
+            + cpu.softirq
+            + cpu.steal
+            + cpu.guest
+            + cpu.guest_nice)
+}
+
+fn total_used_memory(mem: MemInfo) -> usize {
+    ((mem.total - mem.free) * 100) / mem.total
+}
+
 fn main() {}
 
 #[test]
@@ -149,4 +167,30 @@ Active:          7307032 kB
             free: 196332
         }
     );
+}
+
+#[test]
+fn test_cpu_idle() {
+    let stat = Stat {
+        user: 100,
+        nice: 200,
+        system: 300,
+        idle: 4500,
+        iowait: 400,
+        irq: 500,
+        softirq: 600,
+        steal: 700,
+        guest: 800,
+        guest_nice: 900,
+    };
+    assert_eq!(average_cpu_idle(stat), 50);
+}
+
+#[test]
+fn test_total_mem_used() {
+    let mem = MemInfo {
+        total: 1000,
+        free: 500,
+    };
+    assert_eq!(total_used_memory(mem), 50);
 }
