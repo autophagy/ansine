@@ -1,0 +1,95 @@
+body {
+  background-color: #000000;
+  font-family: monospace;
+  color: #ffffff;
+  font-size: 18px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2em;
+}
+
+#logo {
+  display: flex;
+  justify-content: center;
+}
+
+#logo pre {
+  display: inline-block;
+}
+
+#metrics {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  padding: 0;
+}
+
+#metrics label {
+  display: inline-block;
+  width: 20%;
+}
+
+progress {
+  width: 79%;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 0px;
+  height: 16px;
+  background-color: transparent;
+  border: 1px solid white;
+}
+
+progress[value]::-webkit-progress-bar  {
+  background-color: transparent;
+}
+
+progress[value]::-webkit-progress-value {
+  background-color: #ffffff;
+}
+
+progress::-moz-progress-bar {
+    background-color: #ffffff;
+}
+
+#services {
+  list-style: none;
+  margin: 1em 0em;
+  display: flex;
+  padding-left: 0;
+  flex-direction: column;
+}
+
+#services li {
+  display: flex;
+  border: 1px solid white;
+  margin: 1em 0em;
+  padding: 1em;
+  flex-direction: column;
+}
+
+#services .name {
+  font-size: 1em;
+}
+
+#services .desc {
+  font-size: 0.8em;
+  margin: 0.5em 0em;
+}
+
+#services .route {
+  font-size: 0.75em;
+}
+
+#services a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#services a:hover {
+  color: #98FF98;
+}
+
+#services a:hover li {
+  border-color: #98FF98;
+}

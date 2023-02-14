@@ -14,7 +14,7 @@
       {
         packages = rec {
           ansine = naersk-lib.buildPackage {
-            root = ./.;
+            src = ./.;
             doCheck = true;
           };
         };
