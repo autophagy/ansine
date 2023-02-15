@@ -25,11 +25,11 @@
       <li><label for="mem-usage">MEM {{mem}}%</label><progress id="mem-usage" value="{{mem}}" max="100"></progress></li>
     </ul>
     <ul id="services">
-      {% for service in services %}
-      <a href="{{service.route}}"><li>
-        <span class="name">{{ service.name }}</span>
-        <span class="desc">{{ service.desc }}</span>
-        <span class="route">{{service.route}}</span>
+      {% for (name, detail) in services %}
+      <a href="{{detail.route}}"><li>
+        <span class="name">{{ name }}</span>
+        <span class="desc">{{ detail.description }}</span>
+        <span class="route">{{ detail.route }}</span>
       </li></a>
       {% endfor %}
   </body>

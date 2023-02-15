@@ -1,6 +1,8 @@
 mod parser;
 
-use std::{fs::read_to_string, net::SocketAddr, path::Path, str, time::Duration};
+use std::{
+    collections::HashMap, fs::read_to_string, net::SocketAddr, path::Path, str, time::Duration,
+};
 
 use askama::Template;
 use axum::{
@@ -16,14 +18,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 struct ServiceDescription {
-    name: String,
-    desc: String,
+    description: String,
     route: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Configuration {
-    services: Vec<ServiceDescription>,
+    port: u16,
+    services: HashMap<String, ServiceDescription>,
 }
 
 fn read_file(fp: &str) -> String {
@@ -43,7 +45,10 @@ fn load_configuration(path: &Path) -> Configuration {
         let data = read_to_string(path).expect("Unable to read file");
         serde_json::from_str(&data).expect("Unable to parse JSON file")
     } else {
-        Configuration { services: vec![] }
+        Configuration {
+            port: 3000,
+            services: HashMap::new(),
+        }
     }
 }
 
@@ -53,11 +58,11 @@ async fn main() {
     let config_path = Path::new(&config_path);
     let config = load_configuration(config_path);
 
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let app = Router::new()
         .route("/", get(root))
         .route("/assets/*file", get(assets))
         .with_state(config);
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
@@ -108,7 +113,7 @@ struct IndexTemplate {
     uptime: String,
     cpu: usize,
     mem: usize,
-    services: Vec<ServiceDescription>,
+    services: HashMap<String, ServiceDescription>,
 }
 
 struct HtmlTemplate<T>(T);
