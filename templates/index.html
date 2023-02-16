@@ -23,6 +23,7 @@
       <li><label for="uptime">UPTIME</label><span id="uptime">{{ uptime }}</span></li>
       <li><label for="cpu-usage">CPU {{cpu}}%</label><progress id="cpu-usage" value="{{cpu}}" max="100"></progress></li>
       <li><label for="mem-usage">MEM {{mem}}%</label><progress id="mem-usage" value="{{mem}}" max="100"></progress></li>
+      <li><label for="swap-usage">SWP {{swap}}%</label><progress id="swap-usage" value="{{swap}}" max="100"></progress></li>
     </ul>
     <ul id="services">
       {% for (name, detail) in services %}

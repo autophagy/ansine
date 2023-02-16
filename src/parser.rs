@@ -1,12 +1,15 @@
 use nom::{
-    bytes::complete::{tag, take_until},
-    character::complete::{digit1, multispace0},
+    branch::alt,
+    bytes::complete::{tag, take_till, take_until},
+    character::complete::{alphanumeric1, char, digit1, line_ending, multispace0},
     combinator::{map, map_res},
     error::ParseError,
+    multi::many0,
     number::complete::double,
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
+use std::collections::HashMap;
 use std::str;
 use std::time::Duration;
 
@@ -52,6 +55,18 @@ impl MemInfo {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Swap {
+    size: usize,
+    used: usize,
+}
+
+impl Swap {
+    pub fn total_used(&self) -> usize {
+        (self.used * 100) / self.size
+    }
+}
+
 fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     F: FnMut(&'a str) -> IResult<&'a str, O, E>,
@@ -60,8 +75,14 @@ where
 }
 
 fn parse_usize(i: &str) -> IResult<&str, usize> {
-    let parser = map_res(map(ws(digit1), str::as_bytes), str::from_utf8);
-    map_res(parser, str::FromStr::from_str)(i)
+    map_res(ws(digit1), str::FromStr::from_str)(i)
+}
+
+fn parse_isize(i: &str) -> IResult<&str, isize> {
+    map_res(
+        ws(alt((preceded(char('-'), digit1), digit1))),
+        str::FromStr::from_str,
+    )(i)
 }
 
 fn parse_f64(i: &str) -> IResult<&str, f64> {
@@ -108,10 +129,33 @@ pub fn parse_uptime(i: &str) -> IResult<&str, Duration> {
 }
 
 pub fn parse_meminfo(i: &str) -> IResult<&str, MemInfo> {
-    let (i, total) = delimited(tag("MemTotal:"), parse_usize, tag("kB\n"))(i)?;
-    let (i, _) = delimited(tag("MemFree:"), parse_usize, tag("kB\n"))(i)?;
-    let (i, available) = delimited(tag("MemAvailable:"), parse_usize, tag("kB\n"))(i)?;
+    let (i, total) = delimited(tag("MemTotal:"), parse_usize, pair(tag("kB"), line_ending))(i)?;
+    let (i, _) = delimited(tag("MemFree:"), parse_usize, pair(tag("kB"), line_ending))(i)?;
+    let (i, available) = delimited(
+        tag("MemAvailable:"),
+        parse_usize,
+        pair(tag("kB"), line_ending),
+    )(i)?;
     Ok((i, MemInfo { total, available }))
+}
+
+pub fn parse_swaps(i: &str) -> IResult<&str, HashMap<String, Swap>> {
+    let (i, _) = tuple((
+        ws(tag("Filename")),
+        ws(tag("Type")),
+        ws(tag("Size")),
+        ws(tag("Used")),
+        ws(pair(tag("Priority"), line_ending)),
+    ))(i)?;
+
+    map(many0(parse_swap_line), |swaps| swaps.into_iter().collect())(i)
+}
+
+pub fn parse_swap_line(i: &str) -> IResult<&str, (String, Swap)> {
+    let (i, filename) = take_till(char::is_whitespace)(i)?;
+    let (i, (_type, size, used, _priority)) =
+        tuple((ws(alphanumeric1), parse_usize, parse_usize, parse_isize))(i)?;
+    Ok((i, (filename.to_string(), Swap { size, used })))
 }
 
 #[test]
@@ -172,6 +216,34 @@ Active:          7307032 kB
 }
 
 #[test]
+fn parse_proc_swaps() {
+    let proc_swaps = "Filename				Type		Size		Used		Priority
+/swapfi-1                               file		1000000		50000		-2
+/swapfi-2                               file		2000000		80000		-2
+";
+    let (_, swaps) = parse_swaps(proc_swaps).unwrap();
+    assert_eq!(
+        swaps,
+        HashMap::from([
+            (
+                "/swapfi-1".to_string(),
+                Swap {
+                    size: 1000000,
+                    used: 50000
+                }
+            ),
+            (
+                "/swapfi-2".to_string(),
+                Swap {
+                    size: 2000000,
+                    used: 80000,
+                }
+            )
+        ])
+    );
+}
+
+#[test]
 fn test_cpu_idle() {
     let stat = Stat {
         user: 100,
@@ -195,4 +267,13 @@ fn test_total_mem_used() {
         available: 500,
     };
     assert_eq!(mem.total_used(), 50);
+}
+
+#[test]
+fn test_total_swap_used() {
+    let swap = Swap {
+        size: 1000,
+        used: 500,
+    };
+    assert_eq!(swap.total_used(), 50);
 }

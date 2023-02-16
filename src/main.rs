@@ -113,6 +113,7 @@ struct IndexTemplate {
     uptime: String,
     cpu: usize,
     mem: usize,
+    swap: usize,
     services: HashMap<String, ServiceDescription>,
 }
 
@@ -138,16 +139,19 @@ async fn root(State(config): State<Configuration>) -> impl IntoResponse {
     let proc_stat = read_file("/proc/stat");
     let proc_meminfo = read_file("/proc/meminfo");
     let proc_uptime = read_file("/proc/uptime");
+    let proc_swaps = read_file("/proc/swaps");
 
     let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
     let (_, mem_info) =
         parser::parse_meminfo(&proc_meminfo).expect("Unable to parse /proc/meminfo");
     let (_, uptime) = parser::parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
+    let (_, swaps) = parser::parse_swaps(&proc_swaps).expect("Unable to parse /proc/swaps");
 
     let template = IndexTemplate {
         uptime: format_duration(&uptime),
         cpu: 100 - stat.average_idle(),
         mem: mem_info.total_used(),
+        swap: swaps.into_values().map(|s| s.total_used()).sum(),
         services: config.services,
     };
     HtmlTemplate(template)
