@@ -14,7 +14,7 @@ use axum::{
     body::{boxed, Full},
     extract::State,
     http::{header, StatusCode, Uri},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Response, Json},
     routing::get,
     Router,
 };
@@ -33,6 +33,7 @@ struct Configuration {
     port: u16,
     nixos_current_system: bool,
     services: HashMap<String, ServiceDescription>,
+    refresh_interval: u16,
 }
 
 fn read_file(fp: &str) -> String {
@@ -56,6 +57,7 @@ fn load_configuration(path: &Path) -> Configuration {
             port: 3000,
             nixos_current_system: false,
             services: HashMap::new(),
+            refresh_interval: 10,
         }
     }
 }
@@ -69,6 +71,7 @@ async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let app = Router::new()
         .route("/", get(root))
+        .route("/metrics", get(metrics))
         .route("/assets/*file", get(assets))
         .with_state(config);
     axum::Server::bind(&addr)
@@ -118,12 +121,10 @@ async fn assets(uri: Uri) -> impl IntoResponse {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
-    uptime: String,
-    cpu: usize,
-    mem: usize,
-    swap: usize,
+    metrics: Metrics,
     services: HashMap<String, ServiceDescription>,
     current_system: Option<String>,
+    refresh_interval: u16,
 }
 
 struct HtmlTemplate<T>(T);
@@ -150,17 +151,19 @@ fn read_nixos_current_system() -> Option<String> {
     Some(current_system.to_string())
 }
 
-async fn root(State(config): State<Configuration>) -> impl IntoResponse {
+#[derive(Serialize)]
+struct Metrics {
+    uptime: String,
+    cpu: usize,
+    mem: usize,
+    swap: usize,
+}
+
+fn get_system_metrics() -> Metrics {
     let proc_stat = read_file("/proc/stat");
     let proc_meminfo = read_file("/proc/meminfo");
     let proc_uptime = read_file("/proc/uptime");
     let proc_swaps = read_file("/proc/swaps");
-
-    let current_system = if config.nixos_current_system {
-        read_nixos_current_system()
-    } else {
-        None
-    };
 
     let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
     let (_, mem_info) =
@@ -168,13 +171,30 @@ async fn root(State(config): State<Configuration>) -> impl IntoResponse {
     let (_, uptime) = parser::parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
     let (_, swaps) = parser::parse_swaps(&proc_swaps).expect("Unable to parse /proc/swaps");
 
-    let template = IndexTemplate {
-        uptime: format_duration(&uptime),
+    Metrics {uptime: format_duration(&uptime),
         cpu: 100 - stat.average_idle(),
         mem: mem_info.total_used(),
-        swap: swaps.into_values().map(|s| s.total_used()).sum(),
+        swap: swaps.into_values().map(|s| s.total_used()).sum() }
+}
+
+async fn root(State(config): State<Configuration>) -> impl IntoResponse {
+    let metrics = get_system_metrics();
+
+    let current_system = if config.nixos_current_system {
+        read_nixos_current_system()
+    } else {
+        None
+    };
+
+    let template = IndexTemplate {
+        metrics,
         services: config.services,
         current_system,
+        refresh_interval: config.refresh_interval,
     };
     HtmlTemplate(template)
+}
+
+async fn metrics() -> impl IntoResponse {
+    Json(get_system_metrics())
 }

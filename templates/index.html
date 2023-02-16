@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Ansíne</title>
     <link rel="stylesheet" href="assets/index.css"/>
+    <script src="assets/index.js"></script>
   </head>
   <body>
     <div id="logo">
@@ -20,10 +21,10 @@
        '~'</pre>
     </div>
     <ul id="metrics">
-      <li><label for="uptime">UPTIME</label><span id="uptime">{{ uptime }}</span></li>
-      <li><label for="cpu-usage">CPU {{cpu}}%</label><progress id="cpu-usage" value="{{cpu}}" max="100"></progress></li>
-      <li><label for="mem-usage">MEM {{mem}}%</label><progress id="mem-usage" value="{{mem}}" max="100"></progress></li>
-      <li><label for="swap-usage">SWP {{swap}}%</label><progress id="swap-usage" value="{{swap}}" max="100"></progress></li>
+      <li><label for="uptime">UPTIME</label><span id="uptime">{{ metrics.uptime }}</span></li>
+      <li><label id="cpu-usage-label" for="cpu-usage">CPU {{metrics.cpu}}%</label><progress id="cpu-usage" value="{{metrics.cpu}}" max="100"></progress></li>
+      <li><label id="mem-usage-label" for="mem-usage">MEM {{metrics.mem}}%</label><progress id="mem-usage" value="{{metrics.mem}}" max="100"></progress></li>
+      <li><label id="swap-usage-label" for="swap-usage">SWP {{metrics.swap}}%</label><progress id="swap-usage" value="{{metrics.swap}}" max="100"></progress></li>
     </ul>
     <ul id="services">
       {% for (name, detail) in services %}
@@ -41,5 +42,8 @@
       {% when None %}
       {% endmatch %}
     </footer>
+    <script type="text/javascript">
+      refresh_metrics({{ refresh_interval }});
+    </script>
   </body>
 </html>
