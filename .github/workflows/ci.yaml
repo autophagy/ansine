@@ -1,0 +1,48 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+name: CI
+
+jobs:
+  build:
+    name: Nix build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v19
+        with:
+          extra_nix_config: |
+            log-lines = 200
+      - uses: cachix/cachix-action@v10
+        with:
+          name: autophagy
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          pushFilter: "(rustc-1.60.0-x86_64-unknown-linux-gnu$|.drv.chroot$)"
+      - name: Build Ansine
+        run: nix build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v15
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            log-lines = 200
+      - uses: cachix/cachix-action@v10
+        with:
+          name: autophagy
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          pushFilter: "(rustc-1.60.0-x86_64-unknown-linux-gnu$|.drv.chroot$)"
+      - name: Cargo check
+        run: nix develop -c cargo check
+      - name: Rustfmt check
+        run: nix develop -c cargo fmt --all -- --check
+      - name: Clippy check
+        run: nix develop -c cargo clippy -p ansine -- -D warnings --no-deps
