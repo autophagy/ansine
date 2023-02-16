@@ -33,5 +33,13 @@
         <span class="route">{{ detail.route }}</span>
       </li></a>
       {% endfor %}
+    </ul>
+    <footer>
+      {% match current_system %}
+      {% when Some with (v) %}
+      {{ v }}
+      {% when None %}
+      {% endmatch %}
+    </footer>
   </body>
 </html>

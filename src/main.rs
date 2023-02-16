@@ -1,7 +1,12 @@
 mod parser;
 
 use std::{
-    collections::HashMap, fs::read_to_string, net::SocketAddr, path::Path, str, time::Duration,
+    collections::HashMap,
+    fs::{read_link, read_to_string},
+    net::SocketAddr,
+    path::Path,
+    str,
+    time::Duration,
 };
 
 use askama::Template;
@@ -23,8 +28,10 @@ struct ServiceDescription {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct Configuration {
     port: u16,
+    nixos_current_system: bool,
     services: HashMap<String, ServiceDescription>,
 }
 
@@ -47,6 +54,7 @@ fn load_configuration(path: &Path) -> Configuration {
     } else {
         Configuration {
             port: 3000,
+            nixos_current_system: false,
             services: HashMap::new(),
         }
     }
@@ -115,6 +123,7 @@ struct IndexTemplate {
     mem: usize,
     swap: usize,
     services: HashMap<String, ServiceDescription>,
+    current_system: Option<String>,
 }
 
 struct HtmlTemplate<T>(T);
@@ -135,11 +144,23 @@ where
     }
 }
 
+fn read_nixos_current_system() -> Option<String> {
+    let link = read_link("/run/current-system").ok()?;
+    let (_, current_system) = parser::parse_nix_store_path(link.to_str()?).ok()?;
+    Some(current_system.to_string())
+}
+
 async fn root(State(config): State<Configuration>) -> impl IntoResponse {
     let proc_stat = read_file("/proc/stat");
     let proc_meminfo = read_file("/proc/meminfo");
     let proc_uptime = read_file("/proc/uptime");
     let proc_swaps = read_file("/proc/swaps");
+
+    let current_system = if config.nixos_current_system {
+        read_nixos_current_system()
+    } else {
+        None
+    };
 
     let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
     let (_, mem_info) =
@@ -153,6 +174,7 @@ async fn root(State(config): State<Configuration>) -> impl IntoResponse {
         mem: mem_info.total_used(),
         swap: swaps.into_values().map(|s| s.total_used()).sum(),
         services: config.services,
+        current_system,
     };
     HtmlTemplate(template)
 }

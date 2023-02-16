@@ -93,3 +93,8 @@ progress::-moz-progress-bar {
 #services a:hover li {
   border-color: #98FF98;
 }
+
+footer {
+  word-wrap: anywhere;
+  font-size: 0.75em;
+}

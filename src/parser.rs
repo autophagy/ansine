@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
     character::complete::{alphanumeric1, char, digit1, line_ending, multispace0},
-    combinator::{map, map_res},
+    combinator::{map, map_res, rest},
     error::ParseError,
     multi::many0,
     number::complete::double,
@@ -158,6 +158,10 @@ pub fn parse_swap_line(i: &str) -> IResult<&str, (String, Swap)> {
     Ok((i, (filename.to_string(), Swap { size, used })))
 }
 
+pub fn parse_nix_store_path(i: &str) -> IResult<&str, &str> {
+    preceded(tag("/nix/store/"), rest)(i)
+}
+
 #[test]
 fn parse_proc_stat() {
     let proc_stat = "cpu  9701702 6293 1291945 119400172 120770 0 120369 0 0 0
@@ -240,6 +244,17 @@ fn parse_proc_swaps() {
                 }
             )
         ])
+    );
+}
+
+#[test]
+fn test_nix_store_path() {
+    let store_path =
+        "/nix/store/072jh6kxgpr04zbdqsy1isbrz5xbkcmb-nixos-system-heorot-23.05.20221218.04f574a";
+    let (_, path) = parse_nix_store_path(store_path).unwrap();
+    assert_eq!(
+        path,
+        "072jh6kxgpr04zbdqsy1isbrz5xbkcmb-nixos-system-heorot-23.05.20221218.04f574a"
     );
 }
 
