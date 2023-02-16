@@ -14,7 +14,7 @@ use axum::{
     body::{boxed, Full},
     extract::State,
     http::{header, StatusCode, Uri},
-    response::{Html, IntoResponse, Response, Json},
+    response::{Html, IntoResponse, Json, Response},
     routing::get,
     Router,
 };
@@ -171,10 +171,12 @@ fn get_system_metrics() -> Metrics {
     let (_, uptime) = parser::parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
     let (_, swaps) = parser::parse_swaps(&proc_swaps).expect("Unable to parse /proc/swaps");
 
-    Metrics {uptime: format_duration(&uptime),
+    Metrics {
+        uptime: format_duration(&uptime),
         cpu: 100 - stat.average_idle(),
         mem: mem_info.total_used(),
-        swap: swaps.into_values().map(|s| s.total_used()).sum() }
+        swap: swaps.into_values().map(|s| s.total_used()).sum(),
+    }
 }
 
 async fn root(State(config): State<Configuration>) -> impl IntoResponse {
