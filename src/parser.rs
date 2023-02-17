@@ -10,21 +10,41 @@ use nom::{
     IResult,
 };
 use std::collections::HashMap;
+use std::ops::Sub;
 use std::str;
 use std::time::Duration;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Stat {
-    user: usize,
-    nice: usize,
-    system: usize,
-    idle: usize,
-    iowait: usize,
-    irq: usize,
-    softirq: usize,
-    steal: usize,
-    guest: usize,
-    guest_nice: usize,
+    pub user: usize,
+    pub nice: usize,
+    pub system: usize,
+    pub idle: usize,
+    pub iowait: usize,
+    pub irq: usize,
+    pub softirq: usize,
+    pub steal: usize,
+    pub guest: usize,
+    pub guest_nice: usize,
+}
+
+impl Sub for Stat {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self {
+            user: self.user - other.user,
+            nice: self.nice - other.nice,
+            system: self.system - other.system,
+            idle: self.idle - other.idle,
+            iowait: self.iowait - other.iowait,
+            irq: self.irq - other.irq,
+            softirq: self.softirq - other.softirq,
+            steal: self.steal - other.steal,
+            guest: self.guest - other.guest,
+            guest_nice: self.guest_nice - other.guest_nice,
+        }
+    }
 }
 
 impl Stat {

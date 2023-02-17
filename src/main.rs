@@ -6,17 +6,17 @@ use std::{
     net::SocketAddr,
     path::Path,
     str,
+    sync::{Arc, RwLock},
     time::Duration,
 };
 
 use askama::Template;
 use axum::{
     body::{boxed, Full},
-    extract::State,
     http::{header, StatusCode, Uri},
     response::{Html, IntoResponse, Json, Response},
     routing::get,
-    Router,
+    Extension, Router,
 };
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,16 @@ struct Configuration {
     services: HashMap<String, ServiceDescription>,
     refresh_interval: u16,
 }
+
+struct State {
+    nixos_current_system: bool,
+    services: HashMap<String, ServiceDescription>,
+    refresh_interval: u16,
+    last_stat: parser::Stat,
+    stat_delta: parser::Stat,
+}
+
+type SharedState = Arc<RwLock<State>>;
 
 fn read_file(fp: &str) -> String {
     read_to_string(fp).expect("Unable to read file")
@@ -69,15 +79,41 @@ async fn main() {
     let config = load_configuration(config_path);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+
+    let proc_stat = read_file("/proc/stat");
+    let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
+
+    let state = State {
+        nixos_current_system: config.nixos_current_system,
+        services: config.services,
+        refresh_interval: config.refresh_interval,
+        last_stat: stat,
+        stat_delta: Default::default(),
+    };
+
+    let state = Arc::new(RwLock::new(state));
+    let stat_state = state.clone();
+
+    let refresh_stat = tokio::task::spawn(async move {
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(config.refresh_interval.into()));
+
+        loop {
+            interval.tick().await;
+            let mut state = stat_state.write().unwrap();
+            let proc_stat = read_file("/proc/stat");
+            let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
+            state.stat_delta = stat - state.last_stat;
+            state.last_stat = stat;
+        }
+    });
     let app = Router::new()
         .route("/", get(root))
         .route("/metrics", get(metrics))
         .route("/assets/*file", get(assets))
-        .with_state(config);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+        .route_layer(Extension(state));
+    let server = axum::Server::bind(&addr).serve(app.into_make_service());
+    let (_, _) = tokio::join!(refresh_stat, server);
 }
 
 #[derive(RustEmbed)]
@@ -159,13 +195,11 @@ struct Metrics {
     swap: usize,
 }
 
-fn get_system_metrics() -> Metrics {
-    let proc_stat = read_file("/proc/stat");
+fn get_system_metrics(stat_delta: &parser::Stat) -> Metrics {
     let proc_meminfo = read_file("/proc/meminfo");
     let proc_uptime = read_file("/proc/uptime");
     let proc_swaps = read_file("/proc/swaps");
 
-    let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
     let (_, mem_info) =
         parser::parse_meminfo(&proc_meminfo).expect("Unable to parse /proc/meminfo");
     let (_, uptime) = parser::parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
@@ -173,16 +207,17 @@ fn get_system_metrics() -> Metrics {
 
     Metrics {
         uptime: format_duration(&uptime),
-        cpu: 100 - stat.average_idle(),
+        cpu: 100 - stat_delta.average_idle(),
         mem: mem_info.total_used(),
         swap: swaps.into_values().map(|s| s.total_used()).sum(),
     }
 }
 
-async fn root(State(config): State<Configuration>) -> impl IntoResponse {
-    let metrics = get_system_metrics();
+async fn root(Extension(state): Extension<SharedState>) -> impl IntoResponse {
+    let state = &state.read().unwrap();
+    let metrics = get_system_metrics(&state.stat_delta);
 
-    let current_system = if config.nixos_current_system {
+    let current_system = if state.nixos_current_system {
         read_nixos_current_system()
     } else {
         None
@@ -190,13 +225,14 @@ async fn root(State(config): State<Configuration>) -> impl IntoResponse {
 
     let template = IndexTemplate {
         metrics,
-        services: config.services,
+        services: state.services.clone(),
         current_system,
-        refresh_interval: config.refresh_interval,
+        refresh_interval: state.refresh_interval,
     };
     HtmlTemplate(template)
 }
 
-async fn metrics() -> impl IntoResponse {
-    Json(get_system_metrics())
+async fn metrics(Extension(state): Extension<SharedState>) -> impl IntoResponse {
+    let state = &state.read().unwrap();
+    Json(get_system_metrics(&state.stat_delta))
 }
