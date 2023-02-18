@@ -21,10 +21,10 @@
        '~'</pre>
     </div>
     <ul id="metrics">
-      <li><label for="uptime">UPTIME</label><span id="uptime">{{ metrics.uptime }}</span></li>
-      <li><label id="cpu-usage-label" for="cpu-usage">CPU {{metrics.cpu}}%</label><progress id="cpu-usage" value="{{metrics.cpu}}" max="100"></progress></li>
-      <li><label id="mem-usage-label" for="mem-usage">MEM {{metrics.mem}}%</label><progress id="mem-usage" value="{{metrics.mem}}" max="100"></progress></li>
-      <li><label id="swap-usage-label" for="swap-usage">SWP {{metrics.swap}}%</label><progress id="swap-usage" value="{{metrics.swap}}" max="100"></progress></li>
+      <li><label for="uptime">UPTIME</label><span id="uptime">0d.0h.0s</span></li>
+      <li><label id="cpu-usage-label" for="cpu-usage">CPU 0%</label><progress id="cpu-usage" value="0" max="1"></progress></li>
+      <li><label id="mem-usage-label" for="mem-usage">MEM 0%</label><progress id="mem-usage" value="0" max="1"></progress></li>
+      <li><label id="swap-usage-label" for="swap-usage">SWP 0%</label><progress id="swap-usage" value="0" max="1"></progress></li>
     </ul>
     <ul id="services">
       {% for (name, detail) in services %}
@@ -35,15 +35,10 @@
       </li></a>
       {% endfor %}
     </ul>
-    <footer>
-      {% match current_system %}
-      {% when Some with (v) %}
-      {{ v }}
-      {% when None %}
-      {% endmatch %}
+    <footer id="current-system">
     </footer>
     <script type="text/javascript">
-      refresh_metrics({{ refresh_interval }});
+      init_metrics({{ refresh_interval }});
     </script>
   </body>
 </html>

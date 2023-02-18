@@ -1,8 +1,9 @@
+mod metrics;
 mod parser;
 
 use std::{
     collections::HashMap,
-    fs::{read_link, read_to_string},
+    fs::read_to_string,
     net::SocketAddr,
     path::Path,
     str,
@@ -40,23 +41,11 @@ struct State {
     nixos_current_system: bool,
     services: HashMap<String, ServiceDescription>,
     refresh_interval: u16,
-    last_stat: parser::Stat,
-    stat_delta: parser::Stat,
+    last_metrics: metrics::Metrics,
+    metrics: metrics::Metrics,
 }
 
 type SharedState = Arc<RwLock<State>>;
-
-fn read_file(fp: &str) -> String {
-    read_to_string(fp).expect("Unable to read file")
-}
-
-fn format_duration(duration: &Duration) -> String {
-    let secs = duration.as_secs();
-    let days = secs / 86400;
-    let hours = (secs % 86400) / 3600;
-    let mins = (secs % 3600) / 60;
-    format!("{}d.{}h.{}m", days, hours, mins)
-}
 
 fn load_configuration(path: &Path) -> Configuration {
     if path.exists() {
@@ -80,15 +69,16 @@ async fn main() {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
 
-    let proc_stat = read_file("/proc/stat");
-    let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
+    let init_metrics: metrics::Metrics = Default::default();
+
+    let metrics = metrics::get_metrics(&init_metrics, config.nixos_current_system).unwrap();
 
     let state = State {
         nixos_current_system: config.nixos_current_system,
         services: config.services,
         refresh_interval: config.refresh_interval,
-        last_stat: stat,
-        stat_delta: Default::default(),
+        last_metrics: init_metrics,
+        metrics,
     };
 
     let state = Arc::new(RwLock::new(state));
@@ -101,15 +91,15 @@ async fn main() {
         loop {
             interval.tick().await;
             let mut state = stat_state.write().unwrap();
-            let proc_stat = read_file("/proc/stat");
-            let (_, stat) = parser::parse_stat(&proc_stat).expect("Unable to parse /proc/stat");
-            state.stat_delta = stat - state.last_stat;
-            state.last_stat = stat;
+            let metrics =
+                metrics::get_metrics(&state.last_metrics, state.nixos_current_system).unwrap();
+            state.last_metrics = state.metrics.clone();
+            state.metrics = metrics;
         }
     });
     let app = Router::new()
         .route("/", get(root))
-        .route("/metrics", get(metrics))
+        .route("/metrics", get(metrics_api))
         .route("/assets/*file", get(assets))
         .route_layer(Extension(state));
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
@@ -157,9 +147,7 @@ async fn assets(uri: Uri) -> impl IntoResponse {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
-    metrics: Metrics,
     services: HashMap<String, ServiceDescription>,
-    current_system: Option<String>,
     refresh_interval: u16,
 }
 
@@ -181,58 +169,17 @@ where
     }
 }
 
-fn read_nixos_current_system() -> Option<String> {
-    let link = read_link("/run/current-system").ok()?;
-    let (_, current_system) = parser::parse_nix_store_path(link.to_str()?).ok()?;
-    Some(current_system.to_string())
-}
-
-#[derive(Serialize)]
-struct Metrics {
-    uptime: String,
-    cpu: usize,
-    mem: usize,
-    swap: usize,
-}
-
-fn get_system_metrics(stat_delta: &parser::Stat) -> Metrics {
-    let proc_meminfo = read_file("/proc/meminfo");
-    let proc_uptime = read_file("/proc/uptime");
-    let proc_swaps = read_file("/proc/swaps");
-
-    let (_, mem_info) =
-        parser::parse_meminfo(&proc_meminfo).expect("Unable to parse /proc/meminfo");
-    let (_, uptime) = parser::parse_uptime(&proc_uptime).expect("Unable to parse /proc/uptime");
-    let (_, swaps) = parser::parse_swaps(&proc_swaps).expect("Unable to parse /proc/swaps");
-
-    Metrics {
-        uptime: format_duration(&uptime),
-        cpu: 100 - stat_delta.average_idle(),
-        mem: mem_info.total_used(),
-        swap: swaps.into_values().map(|s| s.total_used()).sum(),
-    }
-}
-
 async fn root(Extension(state): Extension<SharedState>) -> impl IntoResponse {
     let state = &state.read().unwrap();
-    let metrics = get_system_metrics(&state.stat_delta);
-
-    let current_system = if state.nixos_current_system {
-        read_nixos_current_system()
-    } else {
-        None
-    };
 
     let template = IndexTemplate {
-        metrics,
         services: state.services.clone(),
-        current_system,
         refresh_interval: state.refresh_interval,
     };
     HtmlTemplate(template)
 }
 
-async fn metrics(Extension(state): Extension<SharedState>) -> impl IntoResponse {
+async fn metrics_api(Extension(state): Extension<SharedState>) -> impl IntoResponse {
     let state = &state.read().unwrap();
-    Json(get_system_metrics(&state.stat_delta))
+    Json(state.metrics.clone())
 }
