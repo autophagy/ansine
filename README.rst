@@ -38,3 +38,46 @@ Ansíne expects an environment variable named ``ANSINE_CONFIG_PATH`` to be prese
       }
     }
   }
+
+NixOS Module
+------------
+
+Ansíne can also be installed as a NixOS module:
+
+.. code-block:: nix
+
+  {
+    inputs.ansine.url = "github:autophagy/ansine";
+
+    outputs = { self, nixpkgs, ansine }: {
+      nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux"; # or whatever your system is
+        modules = [
+          ./configuration.nix
+          ansine.nixosModules.default
+        ];
+      };
+    };
+  }
+
+It can then be enabled and configured like so:
+
+.. code-block:: nix
+
+  {
+    services.ansine = {
+      enable = true;
+      port = 3134;
+      refreshInterval = 3;
+      services = {
+        Jellyfin = {
+          description = "Media system";
+          route = "/jellyfin/";
+        };
+        Vaultwarden = {
+          description = "Bitwarden compatible credential storage";
+          route = "/vault/";
+        };
+      };
+    };
+  }
