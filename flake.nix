@@ -16,17 +16,18 @@
         # `nix build`
         packages.ansine = pkgs.callPackage ./. { inherit naersk-lib; };
         packages.default = packages.ansine;
-        overlays.ansine = final: prev: { inherit (packages) ansine; };
+        devShell = with pkgs; mkShell {
+          buildInputs = [ cargo rustc rustfmt rustPackages.clippy ];
+          RUST_SRC_PATH = rustPlatform.rustLibSrc;
+        };
+        formatter = pkgs.nixpkgs-fmt;
+      }) // {
+        overlays.ansine = final: prev: { inherit (self.packages.${final.system}) ansine; };
         overlays.default = self.overlays.ansine;
         nixosModules.ansine = { pkgs, ... }: {
           nixpkgs.overlays = [ self.overlays.default ];
           imports = [ ./module.nix ];
         };
         nixosModules.default = self.nixosModules.ansine;
-        devShell = with pkgs; mkShell {
-          buildInputs = [ cargo rustc rustfmt rustPackages.clippy ];
-          RUST_SRC_PATH = rustPlatform.rustLibSrc;
-        };
-        formatter = pkgs.nixpkgs-fmt;
-      });
+      };
 }
