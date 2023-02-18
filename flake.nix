@@ -10,23 +10,23 @@
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        naersk-lib = naersk.lib.${system};
+        naersk-lib = pkgs.callPackage naersk { };
       in
-      {
-        packages = rec {
-          ansine = naersk-lib.buildPackage {
-            root = ./.;
-            doCheck = true;
-          };
+      rec {
+        # `nix build`
+        packages.ansine = pkgs.callPackage ./. { inherit naersk-lib; };
+        packages.default = packages.ansine;
+        overlays.ansine = final: prev: { inherit (packages) ansine; };
+        overlays.default = self.overlays.ansine;
+        nixosModules.ansine = { pkgs, ... }: {
+          nixpkgs.overlays = [ self.overlays.default ];
+          imports = [ ./module.nix ];
         };
-
-        defaultPackage = self.packages.${system}.ansine;
-
+        nixosModules.default = self.nixosModules.ansine;
         devShell = with pkgs; mkShell {
           buildInputs = [ cargo rustc rustfmt rustPackages.clippy ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };
-
         formatter = pkgs.nixpkgs-fmt;
       });
 }
