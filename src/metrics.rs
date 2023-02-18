@@ -16,7 +16,7 @@ fn read_file(fp: &str) -> Result<String, MetricError> {
     let s = fs::read_to_string(fp);
     match s {
         Ok(s) => Ok(s),
-        Err(_) => Err(MetricError::FileRead(format!("Unable to read {}", fp))),
+        Err(_) => Err(MetricError::FileRead(format!("Unable to read {fp}"))),
     }
 }
 
@@ -26,7 +26,7 @@ fn read_link(fp: &str) -> Result<String, MetricError> {
         .and_then(|l| l.to_str().map(String::from));
     match link {
         Some(l) => Ok(l),
-        None => Err(MetricError::LinkRead(format!("Unable to read link {}", fp))),
+        None => Err(MetricError::LinkRead(format!("Unable to read link {fp}"))),
     }
 }
 
@@ -129,8 +129,7 @@ fn get_metric<T>(fp: &str, f: fn(&str) -> nom::IResult<&str, T>) -> Result<T, Me
     match f(&metric) {
         Ok((_, parsed_metric)) => Ok(parsed_metric),
         Err(_) => Err(MetricError::MetricParse(format!(
-            "Unable to parse metric from {}",
-            fp
+            "Unable to parse metric from {fp}"
         ))),
     }
 }
