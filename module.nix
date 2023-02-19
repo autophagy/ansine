@@ -13,12 +13,12 @@ in
 {
   options = {
     services.ansine = {
-      enable = mkEnableOption (lib.mdDoc "Ansine is a small, lightweight dashboard for home servers.");
+      enable = mkEnableOption (lib.mdDoc "Ansíne, a lightweight home server dashboard.");
 
       port = mkOption {
         type = types.port;
         default = 3000;
-        description = lib.mdDoc "Port number Ansine will listen to.";
+        description = lib.mdDoc "Port number Ansíne will listen to.";
       };
 
       nixosCurrentSystem = mkOption {
@@ -35,7 +35,17 @@ in
 
       services = mkOption {
         default = { };
-        description = lib.mdDoc "Services to expose on the Ansine dashboard";
+        description = lib.mdDoc "Services to expose on the Ansíne dashboard";
+        example = {
+          Jellyfin = {
+            description = "Media system";
+            route = "/jellyfin/";
+          };
+          Vaultwarden = {
+            description = "Bitwarden compatible credential storage";
+            route = "/vault/";
+          };
+        };
         type = types.attrsOf (types.submodule (_: {
           options = {
             description = mkOption {
@@ -58,7 +68,7 @@ in
   config = mkIf cfg.enable {
     users.users.${user} = {
       inherit group;
-      description = "Ansine system user";
+      description = "Ansíne system user";
       isSystemUser = true;
     };
 
@@ -68,7 +78,7 @@ in
 
     systemd.services = {
       ansine = {
-        description = "Ansine service";
+        description = "Ansíne service";
         after = [ "network.target" ];
         environment = {
           ANSINE_CONFIG_PATH = cfgFile;

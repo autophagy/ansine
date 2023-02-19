@@ -1,4 +1,6 @@
 {
+  description = "Ansíne - A lightweight dashboard for home servers";
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     naersk.url = "github:nix-community/naersk/master";
