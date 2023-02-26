@@ -111,6 +111,7 @@ async fn main() {
         .route("/assets/*file", get(assets))
         .route_layer(Extension(state));
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
+    println!("Starting Ansíne on {addr}...");
     let (_, _) = tokio::join!(refresh_stat, server);
 }
 
