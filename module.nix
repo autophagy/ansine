@@ -80,15 +80,12 @@ in
       ansine = {
         description = "Ansíne service";
         after = [ "network.target" ];
-        environment = {
-          ANSINE_CONFIG_PATH = cfgFile;
-        };
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Restart = "on-failure";
           User = user;
           Group = group;
-          ExecStart = "${pkgs.ansine}/bin/ansine";
+          ExecStart = "${pkgs.ansine}/bin/ansine ${cfgFile}";
         };
       };
     };

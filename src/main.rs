@@ -63,7 +63,8 @@ fn load_configuration(path: &Path) -> Configuration {
 
 #[tokio::main]
 async fn main() {
-    let config_path = std::env::var("ANSINE_CONFIG_PATH").expect("Expected ANSINE_CONFIG_PATH");
+    let args: Vec<String> = std::env::args().collect();
+    let config_path = &args.get(1).expect("Expected argument to config path");
     let config_path = Path::new(&config_path);
     let config = load_configuration(config_path);
 
