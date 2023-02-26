@@ -19,25 +19,29 @@ To build::
 Configuration
 -------------
 
-Ansíne expects an environment variable named ``ANSINE_CONFIG_PATH`` to be present and pointing to a JSON configuration file. An example configuration:
+Ansíne expects an environment variable named ``ANSINE_CONFIG_PATH`` to be present and pointing to a JSON configuration file.
 
-.. code-block:: json
+The configuration options are:
 
-  {
-    "port": 3000,
-    "nixosCurrentSystem": true,
-    "refreshInterval": 2,
-    "services": {
-      "Jellyfin": {
-        "description": "Media Player and indexer",
-        "route": "/jellyfin"
-      },
-      "Vaultwarden": {
-        "description": "Bitwarden compatible credential storage",
-        "route": "/vault"
-      }
-    }
-  }
++------------------------+-------------------------------------------------------+---------------+
+| Option                 | Description                                           | Default       |
++========================+=======================================================+===============+
+| ``port``               | The port that the ansine service will listen on.      |    ``3000``   |
++------------------------+-------------------------------------------------------+---------------+
+| ``nixosCurrentSystem`` | Whether or not to determine the current NixOS system  |   ``false``   |
+|                        | from ``/run/current-system``.                         |               |
++------------------------+-------------------------------------------------------+---------------+
+| ``services``           | A set of services to display links to. Of the form::  |    ``{ }``    |
+|                        |                                                       |               |
+|                        |  ServiceName: {                                       |               |
+|                        |      "description": "Service Description",            |               |
+|                        |      "route": "/route-to-service"                     |               |
+|                        |   }                                                   |               |
++------------------------+-------------------------------------------------------+---------------+
+| ``refreshInterval``    | Determines the interval, in seconds, in which to      |    ``10``     |
+|                        | refresh the system metrics. Also determines how often |               |
+|                        | the front-end requests updated metrics.               |               |
++------------------------+-------------------------------------------------------+---------------+
 
 NixOS Module
 ------------
