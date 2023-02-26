@@ -37,6 +37,17 @@ struct Configuration {
     refresh_interval: u16,
 }
 
+impl Default for Configuration {
+    fn default() -> Configuration {
+        Configuration {
+            port: 3000,
+            nixos_current_system: false,
+            services: HashMap::new(),
+            refresh_interval: 10,
+        }
+    }
+}
+
 struct State {
     nixos_current_system: bool,
     services: HashMap<String, ServiceDescription>,
@@ -52,12 +63,7 @@ fn load_configuration(path: &Path) -> Configuration {
         let data = read_to_string(path).expect("Unable to read file");
         serde_json::from_str(&data).expect("Unable to parse JSON file")
     } else {
-        Configuration {
-            port: 3000,
-            nixos_current_system: false,
-            services: HashMap::new(),
-            refresh_interval: 10,
-        }
+        Default::default()
     }
 }
 
