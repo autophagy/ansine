@@ -30,6 +30,7 @@ struct ServiceDescription {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 struct Configuration {
     port: u16,
     nixos_current_system: bool,
