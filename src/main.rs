@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Result;
 use askama::Template;
 use axum::{
     body::{boxed, Full},
@@ -69,7 +70,7 @@ fn load_configuration(path: &Path) -> Configuration {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let config_path = &args.get(1).expect("Expected argument to config path");
     let config_path = Path::new(&config_path);
@@ -79,7 +80,7 @@ async fn main() {
 
     let init_metrics: metrics::Metrics = Default::default();
 
-    let metrics = metrics::get_metrics(&init_metrics, config.nixos_current_system).unwrap();
+    let metrics = metrics::get_metrics(&init_metrics, config.nixos_current_system)?;
 
     let state = State {
         nixos_current_system: config.nixos_current_system,
@@ -92,19 +93,8 @@ async fn main() {
     let state = Arc::new(RwLock::new(state));
     let stat_state = state.clone();
 
-    let refresh_stat = tokio::task::spawn(async move {
-        let mut interval =
-            tokio::time::interval(Duration::from_secs(config.refresh_interval.into()));
+    let refresh_stat = tokio::task::spawn(refresh_metrics(stat_state, config.refresh_interval));
 
-        loop {
-            interval.tick().await;
-            let mut state = stat_state.write().unwrap();
-            let metrics =
-                metrics::get_metrics(&state.last_metrics, state.nixos_current_system).unwrap();
-            state.last_metrics = state.metrics.clone();
-            state.metrics = metrics;
-        }
-    });
     let app = Router::new()
         .route("/", get(root))
         .route("/metrics", get(metrics_api))
@@ -113,6 +103,27 @@ async fn main() {
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
     println!("Starting Ansíne on {addr}...");
     let (_, _) = tokio::join!(refresh_stat, server);
+    Ok(())
+}
+
+async fn refresh_metrics(state: SharedState, refresh_interval: u16) -> Result<()> {
+    let mut interval = tokio::time::interval(Duration::from_secs(refresh_interval.into()));
+
+    loop {
+        interval.tick().await;
+        if let Ok(mut state_guard) = state.write() {
+            if let Ok(metrics) =
+                metrics::get_metrics(&state_guard.last_metrics, state_guard.nixos_current_system)
+            {
+                state_guard.last_metrics = state_guard.metrics.clone();
+                state_guard.metrics = metrics;
+            } else {
+                eprintln!("Failed to refresh metrics")
+            }
+        } else {
+            eprintln!("Failed to aquire write lock")
+        }
+    }
 }
 
 #[derive(RustEmbed)]
@@ -179,16 +190,27 @@ where
 }
 
 async fn root(Extension(state): Extension<SharedState>) -> impl IntoResponse {
-    let state = &state.read().unwrap();
-
-    let template = IndexTemplate {
-        services: state.services.clone(),
-        refresh_interval: state.refresh_interval,
-    };
-    HtmlTemplate(template)
+    match state.read() {
+        Ok(state_guard) => {
+            let template = IndexTemplate {
+                services: state_guard.services.clone(),
+                refresh_interval: state_guard.refresh_interval,
+            };
+            HtmlTemplate(template).into_response()
+        }
+        Err(_) => {
+            eprintln!("Failed to aquire state lock");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+        }
+    }
 }
 
 async fn metrics_api(Extension(state): Extension<SharedState>) -> impl IntoResponse {
-    let state = &state.read().unwrap();
-    Json(state.metrics.clone())
+    match state.read() {
+        Ok(state_guard) => Json(state_guard.metrics.clone()).into_response(),
+        Err(_) => {
+            eprintln!("Failed to acquire state lock");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+        }
+    }
 }

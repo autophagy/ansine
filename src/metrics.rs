@@ -12,6 +12,18 @@ pub enum MetricError {
     MetricParse(String),
 }
 
+impl std::fmt::Display for MetricError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MetricError::FileRead(msg) => write!(f, "FileRead error: {}", msg),
+            MetricError::LinkRead(msg) => write!(f, "LinkRead error: {}", msg),
+            MetricError::MetricParse(msg) => write!(f, "MetricParse error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for MetricError {}
+
 fn read_file(fp: &str) -> Result<String, MetricError> {
     let s = fs::read_to_string(fp);
     match s {
