@@ -138,7 +138,23 @@ pub struct Metrics {
     pub cpu_delta: Cpu,
     pub memory: Memory,
     pub swap: Swap,
+    pub cpu_temp: Option<f64>,
     pub current_system: Option<String>,
+}
+
+const THERMAL_PATH: &str = "/sys/class/thermal/thermal_zone0/temp";
+
+/// Parse a sysfs thermal `temp` value (millidegrees Celsius) into degrees Celsius.
+fn parse_temp_millidegrees(s: &str) -> Option<f64> {
+    s.trim().parse::<i64>().ok().map(|m| m as f64 / 1000.0)
+}
+
+// Read the CPU temp in C from the thermal path.
+fn read_cpu_temp() -> Option<f64> {
+    fs::read_to_string(THERMAL_PATH)
+        .ok()
+        .as_deref()
+        .and_then(parse_temp_millidegrees)
 }
 
 fn get_metric<T>(fp: &str, f: fn(&str) -> nom::IResult<&str, T>) -> Result<T, MetricError> {
@@ -160,6 +176,7 @@ pub fn get_metrics(
     let swap = Swap::from(get_metric("/proc/swaps", parse_swaps)?);
     let cpu_since_boot = Cpu::from(get_metric("/proc/stat", parse_stat)?);
     let cpu_delta = &cpu_since_boot - &last_metrics.cpu_since_boot;
+    let cpu_temp = read_cpu_temp();
     let current_system = if get_current_system {
         Some(read_nixos_current_system()?)
     } else {
@@ -172,6 +189,20 @@ pub fn get_metrics(
         cpu_delta,
         memory,
         swap,
+        cpu_temp,
         current_system,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn temp_parsing() {
+        assert_eq!(parse_temp_millidegrees("43329\n"), Some(43.329));
+        assert_eq!(parse_temp_millidegrees("  0 "), Some(0.0));
+        assert_eq!(parse_temp_millidegrees(""), None);
+        assert_eq!(parse_temp_millidegrees("nope"), None);
+    }
 }

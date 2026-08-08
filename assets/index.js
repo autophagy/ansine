@@ -1,10 +1,16 @@
+// Rpi4 throttle temp
+const TEMP_MAX_C = 85;
+
 function refresh_metrics() {
    const cpu_usage_label = document.getElementById('cpu-usage-label');
+   const cpu_temp_label = document.getElementById('cpu-temp-label');
    const mem_usage_label = document.getElementById('mem-usage-label');
    const swap_usage_label = document.getElementById('swap-usage-label');
 
    const uptime = document.getElementById('uptime');
    const cpu_usage = document.getElementById('cpu-usage');
+   const cpu_temp_row = document.getElementById('cpu-temp-row');
+   const cpu_temp = document.getElementById('cpu-temp');
    const mem_usage = document.getElementById('mem-usage');
    const swap_usage = document.getElementById('swap-usage');
 
@@ -21,6 +27,14 @@ function refresh_metrics() {
 
          cpu_usage_label.textContent = `CPU ${Math.round(cpu*100)}%`;
          cpu_usage.value = cpu;
+
+         if (data.cpu_temp !== null && data.cpu_temp !== undefined) {
+            cpu_temp_row.hidden = false;
+            cpu_temp_label.textContent = `TEMP ${Math.round(data.cpu_temp)}°C`;
+            cpu_temp.value = Math.min(data.cpu_temp / TEMP_MAX_C, 1);
+         } else {
+            cpu_temp_row.hidden = true;
+         }
 
          mem_usage_label.textContent = `MEM ${Math.round(mem*100)}%`;
          mem_usage.value = mem;
