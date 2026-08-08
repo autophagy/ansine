@@ -95,16 +95,21 @@ pub struct Memory {
     pub used: usize,
 }
 
-impl From<MemInfo> for Memory {
-    fn from(m: MemInfo) -> Memory {
-        let total = m.get("MemTotal").expect("Expected MemTotal in meminfo");
-        let available = m
-            .get("MemAvailable")
-            .expect("Expected MemAvailable in meminfo");
-        Memory {
-            total: *total,
+impl TryFrom<MemInfo> for Memory {
+    type Error = MetricError;
+
+    fn try_from(m: MemInfo) -> Result<Memory, MetricError> {
+        let field = |key: &str| {
+            m.get(key)
+                .copied()
+                .ok_or_else(|| MetricError::MetricParse(format!("Missing {key} in /proc/meminfo")))
+        };
+        let total = field("MemTotal")?;
+        let available = field("MemAvailable")?;
+        Ok(Memory {
+            total,
             used: total - available,
-        }
+        })
     }
 }
 
@@ -150,7 +155,7 @@ pub fn get_metrics(
     last_metrics: &Metrics,
     get_current_system: bool,
 ) -> Result<Metrics, MetricError> {
-    let memory = Memory::from(get_metric("/proc/meminfo", parse_meminfo)?);
+    let memory = Memory::try_from(get_metric("/proc/meminfo", parse_meminfo)?)?;
     let uptime = get_metric("/proc/uptime", parse_uptime)?;
     let swap = Swap::from(get_metric("/proc/swaps", parse_swaps)?);
     let cpu_since_boot = Cpu::from(get_metric("/proc/stat", parse_stat)?);

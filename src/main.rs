@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     Extension, Router,
@@ -61,21 +61,23 @@ struct State {
 
 type SharedState = Arc<RwLock<State>>;
 
-fn load_configuration(path: &Path) -> Configuration {
+fn load_configuration(path: &Path) -> Result<Configuration> {
     if path.exists() {
-        let data = read_to_string(path).expect("Unable to read file");
-        serde_json::from_str(&data).expect("Unable to parse JSON file")
+        let data =
+            read_to_string(path).with_context(|| format!("Unable to read {}", path.display()))?;
+        serde_json::from_str(&data)
+            .with_context(|| format!("Unable to parse JSON config {}", path.display()))
     } else {
-        Default::default()
+        Ok(Default::default())
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    let config_path = &args.get(1).expect("Expected argument to config path");
-    let config_path = Path::new(&config_path);
-    let config = load_configuration(config_path);
+    let config_path = std::env::args()
+        .nth(1)
+        .context("Expected a path to a config file as the first argument")?;
+    let config = load_configuration(Path::new(&config_path))?;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
 
