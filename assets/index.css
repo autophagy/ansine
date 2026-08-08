@@ -60,6 +60,22 @@ progress::-moz-progress-bar {
     background-color: #ffffff;
 }
 
+#cpu-temp-row.hot label {
+  color: #ff6161;
+}
+
+#cpu-temp-row.hot progress {
+  border-color: #ff6161;
+}
+
+#cpu-temp-row.hot progress[value]::-webkit-progress-value {
+  background-color: #ff6161;
+}
+
+#cpu-temp-row.hot progress::-moz-progress-bar {
+  background-color: #ff6161;
+}
+
 #services {
   list-style: none;
   margin: 1em 0em;

@@ -32,6 +32,7 @@ function refresh_metrics() {
             cpu_temp_row.hidden = false;
             cpu_temp_label.textContent = `TEMP ${Math.round(data.cpu_temp)}°C`;
             cpu_temp.value = Math.min(data.cpu_temp / TEMP_MAX_C, 1);
+            cpu_temp_row.classList.toggle('hot', data.cpu_temp >= TEMP_MAX_C);
          } else {
             cpu_temp_row.hidden = true;
          }
