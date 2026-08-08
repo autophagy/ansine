@@ -1,12 +1,12 @@
 use nom::{
+    IResult, Parser,
     bytes::complete::{tag, take_till, take_until},
     character::complete::{alphanumeric1, char, digit1, line_ending, multispace0},
     combinator::{map, map_res, opt, recognize, rest},
     error::ParseError,
     multi::many0,
     number::complete::double,
-    sequence::{delimited, preceded, terminated, tuple},
-    IResult,
+    sequence::{delimited, preceded, terminated},
 };
 use std::collections::HashMap;
 use std::str;
@@ -59,31 +59,32 @@ pub struct Swap {
 
 pub type Swaps = HashMap<String, Swap>;
 
-fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl Parser<&'a str, Output = O, Error = E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    F: Parser<&'a str, Output = O, Error = E>,
 {
     delimited(multispace0, inner, multispace0)
 }
 
 fn parse_usize(i: &str) -> IResult<&str, usize> {
-    map_res(ws(digit1), str::FromStr::from_str)(i)
+    map_res(ws(digit1), str::FromStr::from_str).parse(i)
 }
 
 fn parse_isize(i: &str) -> IResult<&str, isize> {
     map_res(
         recognize(preceded(opt(char('-')), digit1)),
         str::FromStr::from_str,
-    )(i)
+    )
+    .parse(i)
 }
 
 fn parse_f64(i: &str) -> IResult<&str, f64> {
-    ws(double)(i)
+    ws(double).parse(i)
 }
 
 pub fn parse_stat(i: &str) -> IResult<&str, Stat> {
-    let (i, _) = take_until("cpu ")(i)?;
-    let parser = tuple((
+    let (i, _) = take_until("cpu ").parse(i)?;
+    let parser = (
         parse_usize,
         parse_usize,
         parse_usize,
@@ -94,10 +95,10 @@ pub fn parse_stat(i: &str) -> IResult<&str, Stat> {
         parse_usize,
         parse_usize,
         parse_usize,
-    ));
+    );
 
     let (i, (user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice)) =
-        preceded(tag("cpu "), parser)(i)?;
+        preceded(tag("cpu "), parser).parse(i)?;
     Ok((
         i,
         Stat {
@@ -123,38 +124,41 @@ pub fn parse_uptime(i: &str) -> IResult<&str, Duration> {
 pub fn parse_meminfo(i: &str) -> IResult<&str, MemInfo> {
     map(many0(parse_meminfo_line), |meminfo| {
         meminfo.into_iter().collect()
-    })(i)
+    })
+    .parse(i)
 }
 
 fn parse_meminfo_line(i: &str) -> IResult<&str, (String, usize)> {
-    let (i, (meminfo, size)) = tuple((
+    let (i, (meminfo, size)) = (
         take_until(":"),
         delimited(
             tag(":"),
             parse_usize,
             terminated(opt(tag("kB")), opt(line_ending)),
         ),
-    ))(i)?;
+    )
+        .parse(i)?;
     Ok((i, (meminfo.to_string(), size)))
 }
 
 pub fn parse_swaps(i: &str) -> IResult<&str, Swaps> {
-    let (i, _) = tuple((
+    let (i, _) = (
         ws(tag("Filename")),
         ws(tag("Type")),
         ws(tag("Size")),
         ws(tag("Used")),
         ws(terminated(tag("Priority"), line_ending)),
-    ))(i)?;
+    )
+        .parse(i)?;
 
-    map(many0(parse_swap_line), |swaps| swaps.into_iter().collect())(i)
+    map(many0(parse_swap_line), |swaps| swaps.into_iter().collect()).parse(i)
 }
 
 pub fn parse_swap_line(i: &str) -> IResult<&str, (String, Swap)> {
-    let (i, filename) = take_till(char::is_whitespace)(i)?;
-    let (i, swap_type) = map_res(ws(alphanumeric1), str::FromStr::from_str)(i)?;
+    let (i, filename) = take_till(char::is_whitespace).parse(i)?;
+    let (i, swap_type) = map_res(ws(alphanumeric1), str::FromStr::from_str).parse(i)?;
     let (i, (size, used, priority)) =
-        terminated(tuple((parse_usize, parse_usize, parse_isize)), line_ending)(i)?;
+        terminated((parse_usize, parse_usize, parse_isize), line_ending).parse(i)?;
     Ok((
         i,
         (
@@ -170,7 +174,7 @@ pub fn parse_swap_line(i: &str) -> IResult<&str, (String, Swap)> {
 }
 
 pub fn parse_nix_store_path(i: &str) -> IResult<&str, &str> {
-    preceded(tag("/nix/store/"), rest)(i)
+    preceded(tag("/nix/store/"), rest).parse(i)
 }
 
 #[cfg(test)]
@@ -271,8 +275,7 @@ DirectMap1G:     4194304 kB";
 
     #[test]
     fn nix_store_path() {
-        let store_path =
-        "/nix/store/072jh6kxgpr04zbdqsy1isbrz5xbkcmb-nixos-system-heorot-23.05.20221218.04f574a";
+        let store_path = "/nix/store/072jh6kxgpr04zbdqsy1isbrz5xbkcmb-nixos-system-heorot-23.05.20221218.04f574a";
         let (_, path) = parse_nix_store_path(store_path).unwrap();
         assert_eq!(
             path,

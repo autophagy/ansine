@@ -1,6 +1,6 @@
 use crate::parser::{
-    parse_meminfo, parse_nix_store_path, parse_stat, parse_swaps, parse_uptime, MemInfo, Stat,
-    Swaps,
+    MemInfo, Stat, Swaps, parse_meminfo, parse_nix_store_path, parse_stat, parse_swaps,
+    parse_uptime,
 };
 use serde::Serialize;
 use std::{fs, ops::Sub, str, time::Duration};
@@ -78,10 +78,10 @@ impl From<Stat> for Cpu {
     }
 }
 
-impl<'a, 'b> Sub<&'b Cpu> for &'a Cpu {
+impl Sub<&Cpu> for &Cpu {
     type Output = Cpu;
 
-    fn sub(self, other: &'b Cpu) -> Cpu {
+    fn sub(self, other: &Cpu) -> Cpu {
         Cpu {
             total: self.total - other.total,
             used: self.used - other.used,

@@ -4,6 +4,7 @@ mod parser;
 use std::{
     collections::HashMap,
     fs::read_to_string,
+    future::IntoFuture,
     net::SocketAddr,
     path::Path,
     str,
@@ -14,11 +15,11 @@ use std::{
 use anyhow::Result;
 use askama::Template;
 use axum::{
-    body::{boxed, Full},
-    http::{header, StatusCode, Uri},
+    Extension, Router,
+    body::Body,
+    http::{StatusCode, Uri, header},
     response::{Html, IntoResponse, Json, Response},
     routing::get,
-    Extension, Router,
 };
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
@@ -98,11 +99,13 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/", get(root))
         .route("/metrics", get(metrics_api))
-        .route("/assets/*file", get(assets))
+        .route("/assets/{*file}", get(assets))
         .route_layer(Extension(state));
-    let server = axum::Server::bind(&addr).serve(app.into_make_service());
+
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
     println!("Starting Ansíne on {addr}...");
-    let (_, _) = tokio::join!(refresh_stat, server);
+    let server = axum::serve(listener, app.into_make_service());
+    let (_, _) = tokio::join!(refresh_stat, server.into_future());
     Ok(())
 }
 
@@ -141,7 +144,7 @@ where
 
         match Asset::get(path.as_str()) {
             Some(content) => {
-                let body = boxed(Full::from(content.data));
+                let body = Body::from(content.data);
                 let mime = mime_guess::from_path(path).first_or_octet_stream();
                 Response::builder()
                     .header(header::CONTENT_TYPE, mime.as_ref())
@@ -150,7 +153,7 @@ where
             }
             None => Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(boxed(Full::from("404")))
+                .body(Body::from("404"))
                 .unwrap(),
         }
     }
