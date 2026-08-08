@@ -19,7 +19,9 @@ To build::
 Configuration
 -------------
 
-Ansíne expects an environment variable named ``ANSINE_CONFIG_PATH`` to be present and pointing to a JSON configuration file.
+Ansíne takes the path to a JSON configuration file as its first command line argument::
+
+  λ ansine /path/to/config.json
 
 The configuration options are:
 
