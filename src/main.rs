@@ -2,7 +2,6 @@ mod metrics;
 mod parser;
 
 use std::{
-    collections::HashMap,
     fs::read_to_string,
     future::IntoFuture,
     net::SocketAddr,
@@ -26,6 +25,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 struct ServiceDescription {
+    name: String,
     description: String,
     route: String,
 }
@@ -36,7 +36,7 @@ struct ServiceDescription {
 struct Configuration {
     port: u16,
     nixos_current_system: bool,
-    services: HashMap<String, ServiceDescription>,
+    services: Vec<ServiceDescription>,
     refresh_interval: u16,
 }
 
@@ -45,7 +45,7 @@ impl Default for Configuration {
         Configuration {
             port: 3000,
             nixos_current_system: false,
-            services: HashMap::new(),
+            services: Vec::new(),
             refresh_interval: 10,
         }
     }
@@ -53,7 +53,7 @@ impl Default for Configuration {
 
 struct State {
     nixos_current_system: bool,
-    services: HashMap<String, ServiceDescription>,
+    services: Vec<ServiceDescription>,
     refresh_interval: u16,
     last_metrics: metrics::Metrics,
     metrics: metrics::Metrics,
@@ -172,7 +172,7 @@ async fn assets(uri: Uri) -> impl IntoResponse {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
-    services: HashMap<String, ServiceDescription>,
+    services: Vec<ServiceDescription>,
     refresh_interval: u16,
 }
 

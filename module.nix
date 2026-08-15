@@ -23,16 +23,18 @@ in
           port = 3134;
           nixosCurrentSystem = true;
           refreshInterval = 3;
-          services = {
-            Jellyfin = {
+          services = [
+            {
+              name = "Jellyfin";
               description = "Media system";
               route = "/jellyfin/";
-            };
-            Vaultwarden = {
+            }
+            {
+              name = "Vaultwarden";
               description = "Bitwarden compatible credential storage";
               route = "/vault/";
-            };
-          };
+            }
+          ];
         };
       };
     };

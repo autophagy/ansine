@@ -33,9 +33,11 @@ The configuration options are:
 | ``nixosCurrentSystem`` | Whether or not to determine the current NixOS system  |   ``false``   |
 |                        | from ``/run/current-system``.                         |               |
 +------------------------+-------------------------------------------------------+---------------+
-| ``services``           | A set of services to display links to. Of the form::  |    ``{ }``    |
+| ``services``           | A list of services to display links to, in the order  |    ``[ ]``    |
+|                        | they should be displayed. Of the form::                |               |
 |                        |                                                       |               |
-|                        |  ServiceName: {                                       |               |
+|                        |  {                                                     |               |
+|                        |      "name": "Service Name",                           |               |
 |                        |      "description": "Service Description",            |               |
 |                        |      "route": "/route-to-service"                     |               |
 |                        |   }                                                   |               |
@@ -75,15 +77,17 @@ It can then be enabled and configured like so:
       enable = true;
       port = 3134;
       refreshInterval = 3;
-      services = {
-        Jellyfin = {
+      services = [
+        {
+          name = "Jellyfin";
           description = "Media system";
           route = "/jellyfin/";
-        };
-        Vaultwarden = {
+        }
+        {
+          name = "Vaultwarden";
           description = "Bitwarden compatible credential storage";
           route = "/vault/";
-        };
-      };
+        }
+      ];
     };
   }

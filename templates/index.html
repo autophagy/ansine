@@ -33,9 +33,9 @@
       <li><label id="swap-usage-label" for="swap-usage">SWP 0%</label><progress id="swap-usage" value="0" max="1"></progress></li>
     </ul>
     <ul id="services">
-      {% for (name, detail) in services %}
+      {% for detail in services %}
       <a href="{{detail.route}}"><li>
-        <span class="name">{{ name }}</span>
+        <span class="name">{{ detail.name }}</span>
         <span class="desc">{{ detail.description }}</span>
         <span class="route">{{ detail.route }}</span>
       </li></a>
